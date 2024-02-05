@@ -11,7 +11,6 @@
     <maven.compiler.target>17</maven.compiler.target>
   </properties>
 
-
   <dependencies>
     <!-- Java Discord API (JDA) -->
     <dependency>
@@ -19,12 +18,22 @@
       <artifactId>JDA</artifactId>
       <version>5.0.0-beta.20</version>
     </dependency>
+
     <!-- Logging implementation -->
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
       <version>1.4.14</version>
     </dependency>
+
+    <!-- Newest version of hibernate-core -->
+    <dependency>
+      <groupId>org.hibernate.orm</groupId>
+      <artifactId>hibernate-core</artifactId>
+      <version>6.4.3.Final</version>
+    </dependency>
+
+
     <!-- Google sheets dependencies -->
     <dependency>
       <groupId>com.google.apis</groupId>
