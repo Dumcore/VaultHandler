@@ -33,6 +33,13 @@
       <version>6.4.3.Final</version>
     </dependency>
 
+    <!-- H2 in memory database -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <version>1.4.200</version>
+    </dependency>
+
 
     <!-- Google sheets dependencies -->
     <dependency>
