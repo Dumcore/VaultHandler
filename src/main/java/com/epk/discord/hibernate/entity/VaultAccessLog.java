@@ -24,6 +24,9 @@ public class VaultAccessLog {
     @Column(name = "access_time")
     Timestamp accessTime = Timestamp.from(Instant.now());
 
+
+    public VaultAccessLog() { }
+
     public VaultAccessLog(Long id, Long accessorId, Set<VaultItem> items, Timestamp accessTime) {
         this.id = id;
         this.accessorId = accessorId;

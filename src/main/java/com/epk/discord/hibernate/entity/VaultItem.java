@@ -18,6 +18,8 @@ public class VaultItem {
     @Column
     private String item;
 
+    public VaultItem() { }
+
     public VaultItem(Integer amount, String item) {
         this.amount = amount;
         this.item = item;
