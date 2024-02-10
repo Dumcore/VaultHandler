@@ -76,13 +76,20 @@ public class VaultHandler extends ListenerAdapter {
                         .addOptions(new OptionData(OptionType.STRING, "gegenstand3", "Der Gegenstand, der gerade eingelagert wurde", false, true))
                         .addOptions(new OptionData(OptionType.STRING, "gegenstand4", "Der Gegenstand, der gerade eingelagert wurde", false, true))
                         .addOptions(new OptionData(OptionType.STRING, "gegenstand5", "Der Gegenstand, der gerade eingelagert wurde", false, true))
+                        .setGuildOnly(true),
+                Commands.slash("auslagern", "Nutzen beim Auslagern von Gegenständen in die Asservatenkammer.")
+                        .addOptions(new OptionData(OptionType.STRING, "gegenstand1", "Der Gegenstand, der gerade eingelagert wurde", true, true))
+                        .addOptions(new OptionData(OptionType.STRING, "gegenstand2", "Der Gegenstand, der gerade eingelagert wurde", false, true))
+                        .addOptions(new OptionData(OptionType.STRING, "gegenstand3", "Der Gegenstand, der gerade eingelagert wurde", false, true))
+                        .addOptions(new OptionData(OptionType.STRING, "gegenstand4", "Der Gegenstand, der gerade eingelagert wurde", false, true))
+                        .addOptions(new OptionData(OptionType.STRING, "gegenstand5", "Der Gegenstand, der gerade eingelagert wurde", false, true))
                         .setGuildOnly(true)
         ).queue();
     }
 
     @Override
     public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
-        if (event.getName().equals("einlagern")) {
+        if (event.getName().equals("einlagern") || event.getName().equals("auslagern")) {
             List<Command.Choice> options = Stream.of(KnownItem.values())
                     .filter(obj -> obj.label.toLowerCase().contains(event.getFocusedOption().getValue().toLowerCase()))
                     .map(obj -> new Command.Choice(obj.label, obj.label))
@@ -98,51 +105,28 @@ public class VaultHandler extends ListenerAdapter {
             return;
         switch (event.getName())
         {
+            case "auslagern":
+                processVaultAccessCommand(event, false);
+                break;
             case "einlagern":
-                log.info(String.valueOf(event.getGuild().getIdLong()));
-                List<String> strings = event.getOptions().stream()
-                        .map(optionMapping -> optionMapping.getAsString())
-                        .distinct()
-                        .collect(Collectors.toList());
-
-                modalCache.put(event.getMember().getIdLong(), strings);
-                List<ActionRow> actionRows = new ArrayList<>();
-
-                for (String string : strings) {
-                    TextInput field = TextInput.create(string+"Id", "Wie viel " + string + " ?", TextInputStyle.SHORT)
-                            .setMaxLength(4)
-                            .setRequired(true)
-                            .build();
-                    actionRows.add(ActionRow.of(field));
-                }
-
-                Modal modal = Modal.create("einlagern", "Gib die Anzahl an.")
-                                .addComponents(actionRows).build();
-
-                event.replyModal(modal).queue(); // "Here are your selected objects: " + Arrays.toString(strings.toArray())
+                processVaultAccessCommand(event, true);
+                break;
+            default:
+                log.info("Command '" + event.getName() + "' does not exist, but was issued by " + event.getMember().getNickname() + " with id: " + event.getMember().getIdLong());
         }
     }
 
     @Override
     public void onModalInteraction(ModalInteractionEvent event) {
-        if (event.getModalId().equals("einlagern")) {
-
-            List<String> items = modalCache.get(event.getMember().getIdLong());
-            modalCache.remove(event.getMember().getIdLong());
-
-            List<Integer> amounts = event.getValues().stream()
-                    .map(input -> Integer.parseInt(input.getAsString()))
-                    .collect(Collectors.toList());
-
-            VaultAccessDTO vaultAccessDTO = new VaultAccessDTO(true);
-
-            int i = 0;
-            for (String item : items) {
-                vaultAccessDTO.addItem(item, amounts.get(i));
-                i++;
-            }
-
-            event.replyEmbeds(createVaultEmbed(vaultAccessDTO, event)).queue();
+        switch (event.getModalId()) {
+            case "auslagern":
+                processVaultAccessModal(event, false);
+                break;
+            case "einlagern":
+                processVaultAccessModal(event, true);
+                break;
+            default:
+                log.error("Interaction for unregistered modal occurred and will be ignored. ModalId: " + event.getModalId());
         }
     }
 
@@ -171,7 +155,7 @@ public class VaultHandler extends ListenerAdapter {
             Set the text of the Embed:
             Arg: text as string
          */
-        eb.setDescription("Officer <@"+event.getMember().getIdLong()+"> hat folgendes eingelagert:\n");
+        eb.setDescription("Officer <@"+event.getMember().getIdLong()+"> hat folgendes " + (vaultAccessDTO.isPutIn() ? "eingelagert" : "ausgelagert") + ":\n");
 
         /*
             Add fields to embed:
@@ -217,6 +201,56 @@ public class VaultHandler extends ListenerAdapter {
         //eb.setImage("https://github.com/zekroTJA/DiscordBot/blob/master/.websrc/logo%20-%20title.png");
 
         return eb.build();
+    }
+
+    private void processVaultAccessCommand(SlashCommandInteractionEvent event, boolean putIn) {
+        log.info(String.valueOf(event.getGuild().getIdLong()));
+        List<String> strings = event.getOptions().stream()
+                .map(optionMapping -> optionMapping.getAsString())
+                .distinct()
+                .collect(Collectors.toList());
+
+        modalCache.put(event.getMember().getIdLong(), strings);
+        List<ActionRow> actionRows = new ArrayList<>();
+
+        for (String string : strings) {
+            TextInput field = TextInput.create(string+"Id", "Wie viel " + string + " ?", TextInputStyle.SHORT)
+                    .setMaxLength(4)
+                    .setRequired(true)
+                    .build();
+            actionRows.add(ActionRow.of(field));
+        }
+        Modal modal;
+        if (putIn) {
+            modal = Modal.create("einlagern", "Wie viel soll eingelagert werden?")
+                    .addComponents(actionRows).build();
+        }
+        else {
+            modal = Modal.create("auslagern", "Wie viel soll ausgelagert werden?")
+                    .addComponents(actionRows).build();
+        }
+
+
+        event.replyModal(modal).queue(); // "Here are your selected objects: " + Arrays.toString(strings.toArray())
+    }
+
+    private void processVaultAccessModal(ModalInteractionEvent event, boolean putIn) {
+        List<String> items = modalCache.get(event.getMember().getIdLong());
+        modalCache.remove(event.getMember().getIdLong());
+
+        List<Integer> amounts = event.getValues().stream()
+                .map(input -> Integer.parseInt(input.getAsString()))
+                .collect(Collectors.toList());
+
+        VaultAccessDTO vaultAccessDTO = new VaultAccessDTO(putIn);
+
+        int i = 0;
+        for (String item : items) {
+            vaultAccessDTO.addItem(item, amounts.get(i));
+            i++;
+        }
+
+        event.replyEmbeds(createVaultEmbed(vaultAccessDTO, event)).queue();
     }
 
 }
