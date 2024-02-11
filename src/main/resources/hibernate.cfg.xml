@@ -25,5 +25,6 @@
         <property name="hibernate.dbcp.minIdle">5</property>
         <property name="hibernate.dbcp.maxWaitMillis">-1</property>
         <mapping class="com.epk.discord.hibernate.entity.VaultItem" />
+        <mapping class="com.epk.discord.hibernate.entity.VaultAccessLog" />
     </session-factory>
 </hibernate-configuration>

@@ -12,17 +12,17 @@ public class VaultItem {
     @GeneratedValue
     private Long id;
 
-    @Column
+    @Column(nullable = false)
     private Integer amount;
 
-    @Column
+    @Column(nullable = false)
     private String item;
 
     public VaultItem() { }
 
-    public VaultItem(Integer amount, String item) {
-        this.amount = amount;
+    public VaultItem(String item, Integer amount) {
         this.item = item;
+        this.amount = amount;
     }
 
     public Long getId() {

@@ -14,14 +14,15 @@ public class VaultAccessLog {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
-    @Column(name = "accessor_id")
+    @Column(name = "accessor_id", nullable = false)
     private Long accessorId;
 
-    @OneToMany(mappedBy = "vault_access_log")
+    @OneToMany(mappedBy = "id")
+    @Column(nullable = false)
     private Set<VaultItem> items;
 
     @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "access_time")
+    @Column(name = "access_time", nullable = false)
     Timestamp accessTime = Timestamp.from(Instant.now());
 
 
