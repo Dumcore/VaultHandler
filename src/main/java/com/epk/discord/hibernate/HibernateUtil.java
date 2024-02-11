@@ -1,14 +1,21 @@
 package com.epk.discord.hibernate;
 
-import org.hibernate.SessionFactory;
+import com.epk.discord.VaultHandler;
+import com.epk.discord.hibernate.entity.VaultAccessLog;
+import com.epk.discord.hibernate.entity.VaultItem;
+import org.hibernate.*;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HibernateUtil {
     private static StandardServiceRegistry registry;
     private static SessionFactory sessionFactory;
+
+    private static final Logger log = LoggerFactory.getLogger(VaultHandler.class);
 
     public static SessionFactory getSessionFactory() {
         if (sessionFactory == null) {
@@ -33,6 +40,24 @@ public class HibernateUtil {
             }
         }
         return sessionFactory;
+    }
+
+    public static void persistEntity(Object entity){
+        Transaction transaction = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            log.trace("Creating transaction");
+            transaction = session.beginTransaction();
+            log.debug("Persisting entity " + entity.getClass() + ": " + entity.toString());
+            session.persist(entity);
+            transaction.commit();
+            log.debug("Successfully persisted entity: " + entity.getClass());
+        } catch (HibernateException ex) {
+            log.error("Exception on persisting entity of type " + entity.getClass().getName() + "! See exception for more information!", ex);
+            if (transaction != null) {
+                log.debug("Rollback transaction");
+                transaction.rollback();
+            }
+        }
     }
 
     public static void shutdown() {
