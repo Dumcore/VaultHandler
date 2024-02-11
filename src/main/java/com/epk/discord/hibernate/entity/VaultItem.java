@@ -1,9 +1,6 @@
 package com.epk.discord.hibernate.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 
 @Entity
 public class VaultItem {
@@ -17,6 +14,9 @@ public class VaultItem {
 
     @Column(nullable = false)
     private String item;
+
+    @ManyToOne()
+    private VaultAccessLog vaultAccessLog;
 
     public VaultItem() { }
 
@@ -47,5 +47,13 @@ public class VaultItem {
 
     public void setItem(String item) {
         this.item = item;
+    }
+
+    public VaultAccessLog getVaultAccessLog() {
+        return vaultAccessLog;
+    }
+
+    public void setVaultAccessLog(VaultAccessLog vaultAccessLog) {
+        this.vaultAccessLog = vaultAccessLog;
     }
 }

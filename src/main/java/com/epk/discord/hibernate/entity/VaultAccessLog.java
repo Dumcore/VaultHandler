@@ -17,7 +17,7 @@ public class VaultAccessLog {
     @Column(name = "accessor_id", nullable = false)
     private Long accessorId;
 
-    @OneToMany(mappedBy = "id")
+    @OneToMany(mappedBy = "vaultAccessLog", cascade=CascadeType.ALL)
     @Column(nullable = false)
     private Set<VaultItem> items;
 
