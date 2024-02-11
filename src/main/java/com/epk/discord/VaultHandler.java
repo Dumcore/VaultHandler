@@ -3,11 +3,12 @@ package com.epk.discord;
 // import com.epk.discord.adapter.SheetConnector;
 import com.epk.discord.dto.KnownItem;
 import com.epk.discord.dto.VaultAccessDTO;
+import com.epk.discord.hibernate.entity.VaultItem;
+import com.epk.discord.hibernate.HibernateUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Invite;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
@@ -24,10 +25,11 @@ import net.dv8tion.jda.api.interactions.components.text.TextInputStyle;
 import net.dv8tion.jda.api.interactions.modals.Modal;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
-import net.dv8tion.jda.internal.entities.GuildImpl;
+import net.dv8tion.jda.internal.utils.JDALogger;
+import org.hibernate.Session;
+import org.hibernate.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.Text;
 
 import java.awt.*;
 import java.io.IOException;
@@ -63,7 +65,7 @@ public class VaultHandler extends ListenerAdapter {
 
         // SheetConnector.sheerMain("", "", "", "");
 
-        Thread.sleep(1000);
+        Thread.sleep(5000);
 
         Guild guild = jda.getGuilds().get(0);
 
@@ -103,6 +105,7 @@ public class VaultHandler extends ListenerAdapter {
         // Only accept commands from guilds
         if (event.getGuild() == null)
             return;
+        log.debug("command /" + event.getName() + " executed by " + event.getMember().getIdLong() + " aka. " + event.getMember().getNickname());
         switch (event.getName())
         {
             case "auslagern":
@@ -240,9 +243,9 @@ public class VaultHandler extends ListenerAdapter {
 
         List<Integer> amounts = event.getValues().stream()
                 .map(input -> Integer.parseInt(input.getAsString()))
-                .collect(Collectors.toList());
+                .toList();
 
-        VaultAccessDTO vaultAccessDTO = new VaultAccessDTO(putIn);
+        VaultAccessDTO vaultAccessDTO = new VaultAccessDTO(putIn, event.getMember().getIdLong());
 
         int i = 0;
         for (String item : items) {
@@ -250,6 +253,13 @@ public class VaultHandler extends ListenerAdapter {
             i++;
         }
 
+        // Persisting only items works, but persisting composite entity (VaultAccessLog) does not seem to persist items!
+        Set<VaultItem> vaultItem = vaultAccessDTO.toVaultAccessLog().getItems();
+        vaultItem.forEach(HibernateUtil::persistEntity);
+        HibernateUtil.persistEntity(vaultAccessDTO.toVaultAccessLog());
+
+        log.info(vaultAccessDTO.isPutIn() ? "In:" : "Out:" + " The officer " + event.getMember().getIdLong() + " aka. " + event.getMember().getEffectiveName() + "accessed the vault!" +
+                "Persist VaultAccessLog");
         event.replyEmbeds(createVaultEmbed(vaultAccessDTO, event)).queue();
     }
 
