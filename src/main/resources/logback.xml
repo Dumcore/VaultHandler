@@ -1,12 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} %boldCyan(%-34.-34thread) %red(%10.10X{jda.shard}) %boldGreen(%-15.-15logger{0}) %highlight(%-6level) %msg%n</pattern>
         </encoder>
     </appender>
 
+    <appender name="HANDLER-LOG" class="ch.qos.logback.core.FileAppender">
+        <file>./logs/vault-handler.log</file>
+        <append>true</append>
+        <immediateFlush>true</immediateFlush>
+        <encoder>
+            <pattern>%-4relative [%thread] %-5level %logger{35} -%kvp- %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="com.epk.discord" level="debug" additivity="false">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="HANDLER-LOG" />
+    </logger>
+
     <root level="debug">
-        <appender-ref ref="STDOUT" />
+        <appender-ref ref="CONSOLE" />
     </root>
 </configuration>
