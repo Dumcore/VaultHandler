@@ -10,6 +10,8 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -32,8 +34,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.awt.*;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.sql.Connection;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -41,33 +47,22 @@ import java.util.stream.Stream;
 
 public class VaultHandler extends ListenerAdapter {
 
-    // String token = new String(Files.readAllBytes(Paths.get(args[0])), StandardCharsets.UTF_8).trim();
-
-    EnumSet<GatewayIntent> intents = EnumSet.of(
-            // Enables MessageReceivedEvent for guild (also known as servers)
-            GatewayIntent.GUILD_MESSAGES,
-            // Enables the event for private channels (also known as direct messages)
-            GatewayIntent.DIRECT_MESSAGES,
-            // Enables access to message.getContentRaw()
-            GatewayIntent.MESSAGE_CONTENT,
-            // Enables MessageReactionAddEvent for guild
-            GatewayIntent.GUILD_MESSAGE_REACTIONS,
-            // Enables MessageReactionAddEvent for private channels
-            GatewayIntent.DIRECT_MESSAGE_REACTIONS
-    );
     private static JDA jda;
+    private static Role adminRole;
+    DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private Map<Long, List<String>> modalCache = new HashMap<>();
-    private static final Logger log = LoggerFactory.getLogger(VaultHandler.class);
-    public static void main(String[] args) throws InterruptedException, GeneralSecurityException, IOException {
-        jda = JDABuilder.createLight("Sample Token", EnumSet.noneOf(GatewayIntent.class)) // slash commands don't need any intents
+    private static final Logger log = JDALogger.getLog(VaultHandler.class);
+    public static void main(String[] args) throws InterruptedException, IOException {
+
+        log.info("Startup application and loading properties!");
+
+        jda = JDABuilder.createLight(Configuration.get("vault_handler_token"), EnumSet.noneOf(GatewayIntent.class)) // slash commands don't need any intents
                 .addEventListeners(new VaultHandler())
                 .build();
 
-        // SheetConnector.sheerMain("", "", "", "");
-
         Thread.sleep(5000);
 
-        Guild guild = jda.getGuilds().get(0);
+        Guild guild = jda.getGuildById(Configuration.get("guild_id"));
 
         CommandListUpdateAction commands = guild.updateCommands();
 
@@ -85,8 +80,32 @@ public class VaultHandler extends ListenerAdapter {
                         .addOptions(new OptionData(OptionType.STRING, "gegenstand3", "Der Gegenstand, der gerade eingelagert wurde", false, true))
                         .addOptions(new OptionData(OptionType.STRING, "gegenstand4", "Der Gegenstand, der gerade eingelagert wurde", false, true))
                         .addOptions(new OptionData(OptionType.STRING, "gegenstand5", "Der Gegenstand, der gerade eingelagert wurde", false, true))
+                        .setGuildOnly(true),
+                Commands.slash("history", "Zeigt eine Übersicht aller ein und ausgelagerten Dienstgegenständen eines Officers.")
+                        .addOptions(new OptionData(OptionType.USER, "officer", "Officer, dessen Historie gezeigt werden soll", true, false))
+                        .addOptions(new OptionData(OptionType.STRING, "startDatum", "Beginn des anzuzeigenden Zeitraums. (24.12.2024)", false, false))
+                        .addOptions(new OptionData(OptionType.STRING, "endDatum", "Ende des anzuzeigenden Zeitraums (24.12.2024)", false, false))
                         .setGuildOnly(true)
         ).queue();
+
+        adminRole = jda.getRoleById(Configuration.get("admin_role_id"));
+
+        Transaction transaction = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            transaction = session.beginTransaction();
+            List<VaultItem> allItems = session.createQuery("from VaultItem", VaultItem.class).getResultList();
+            allItems.forEach(session::remove);
+            log.error("items saved " + allItems.size());
+            allItems.forEach(item -> log.info(Long.toString(item.getId())));
+            transaction.commit();
+            allItems = session.createQuery("from VaultItem", VaultItem.class).getResultList();
+            allItems.forEach(item -> log.info(item.toString()));
+        } catch (Exception e) {
+            if (transaction != null) {
+                transaction.rollback();
+            }
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -114,6 +133,18 @@ public class VaultHandler extends ListenerAdapter {
             case "einlagern":
                 processVaultAccessCommand(event, true);
                 break;
+            case "history":
+                if (event.getMember().getRoles().contains(adminRole)) {
+                    event.reply("Du hast nicht die Berechtigung um diese Aktion auszuführen! Lasse dir dafür die Rolle " + adminRole.getAsMention() + " geben.").setEphemeral(true).queue();
+                    return;
+                }
+                User officer = event.getOption("officer").getAsUser();
+                String startDateString = event.getOption("startDate").getAsString();
+                String endDateString = event.getOption("endDate").getAsString();
+                // TODO: Continue here -> need 2 new queries and null check for dates. (maybe private method for validation)
+                LocalDate startDate = LocalDate.parse(startDateString, dateFormat);
+                LocalDate endDate = LocalDate.parse(endDateString, dateFormat);
+                var accessLogs = HibernateUtil.getVaultAccessLogsByAccessorId(officer.getIdLong());
             default:
                 log.info("Command '" + event.getName() + "' does not exist, but was issued by " + event.getMember().getNickname() + " with id: " + event.getMember().getIdLong());
         }
@@ -134,9 +165,9 @@ public class VaultHandler extends ListenerAdapter {
     }
 
     private MessageEmbed createVaultEmbed(VaultAccessDTO vaultAccessDTO, Interaction event) {
+
         // Create the EmbedBuilder instance
         EmbedBuilder eb = new EmbedBuilder();
-
         /*
             Set the title:
             1. Arg: title as string
@@ -254,11 +285,22 @@ public class VaultHandler extends ListenerAdapter {
         }
 
         // Persisting only items works, but persisting composite entity (VaultAccessLog) does not seem to persist items!
-        Set<VaultItem> vaultItem = vaultAccessDTO.toVaultAccessLog().getItems();
-        vaultItem.forEach(HibernateUtil::persistEntity);
+        //Set<VaultItem> vaultItem = vaultAccessDTO.toVaultAccessLog().getItems();
+        //vaultItem.forEach(HibernateUtil::persistEntity);
         HibernateUtil.persistEntity(vaultAccessDTO.toVaultAccessLog());
 
-        log.info(vaultAccessDTO.isPutIn() ? "In:" : "Out:" + " The officer " + event.getMember().getIdLong() + " aka. " + event.getMember().getEffectiveName() + "accessed the vault!" +
+
+
+        Transaction transaction = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            List<VaultItem> allItems = session.createQuery("from VaultItem", VaultItem.class).getResultList();
+            log.error("items saved " + allItems.size());
+            allItems.forEach(item -> log.info(Long.toString(item.getId())));
+        } catch (Exception e) {
+            log.error("Exception occurred one fetch of VaultItems ", e);
+        }
+
+        log.info((vaultAccessDTO.isPutIn() ? "In:" : "Out:") + " The officer " + event.getMember().getIdLong() + " aka. " + event.getMember().getEffectiveName() + " accessed the vault! " +
                 "Persist VaultAccessLog");
         event.replyEmbeds(createVaultEmbed(vaultAccessDTO, event)).queue();
     }
