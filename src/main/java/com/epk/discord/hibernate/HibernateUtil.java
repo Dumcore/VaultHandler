@@ -11,6 +11,8 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 public class HibernateUtil {
     private static StandardServiceRegistry registry;
     private static SessionFactory sessionFactory;
@@ -42,7 +44,7 @@ public class HibernateUtil {
         return sessionFactory;
     }
 
-    public static void persistEntity(Object entity){
+    public static void persistEntity(Object entity) {
         Transaction transaction = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             log.trace("Creating transaction");
@@ -58,6 +60,20 @@ public class HibernateUtil {
                 transaction.rollback();
             }
         }
+    }
+
+    public static List<VaultAccessLog> getVaultAccessLogsByAccessorId(Long id) {
+        if (id == null) {
+            return null;
+        }
+        List<VaultAccessLog> resultList = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            resultList = session.createNamedQuery("VaultAccessLog_findByAccessorId", VaultAccessLog.class)
+                    .setParameter("accessorId", id).getResultList();
+        } catch (HibernateException ex) {
+            log.error("Exception occured while trying to get VaultAccessLogs by accessorId: " + id, ex);
+        }
+        return resultList;
     }
 
     public static void shutdown() {

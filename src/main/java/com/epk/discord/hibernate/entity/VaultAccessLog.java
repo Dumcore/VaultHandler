@@ -8,6 +8,8 @@ import java.util.Set;
 
 @Entity
 @Table(name = "vault_access_log")
+@NamedQuery(name = "VaultAccessLog_findByAccessorId",
+           query = "from VaultAccessLog where accessorId = :accessorId")
 public class VaultAccessLog {
 
     @Id
