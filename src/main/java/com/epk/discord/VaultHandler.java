@@ -3,15 +3,13 @@ package com.epk.discord;
 // import com.epk.discord.adapter.SheetConnector;
 import com.epk.discord.dto.KnownItem;
 import com.epk.discord.dto.VaultAccessDTO;
+import com.epk.discord.hibernate.entity.VaultAccessLog;
 import com.epk.discord.hibernate.entity.VaultItem;
 import com.epk.discord.hibernate.HibernateUtil;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.MessageEmbed;
-import net.dv8tion.jda.api.entities.Role;
-import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -58,15 +56,11 @@ public class VaultHandler extends ListenerAdapter {
 
         jda = JDABuilder.createLight(Configuration.get("vault_handler_token"), EnumSet.noneOf(GatewayIntent.class)) // slash commands don't need any intents
                 .addEventListeners(new VaultHandler())
-                .build();
-
-        Thread.sleep(5000);
+                .build().awaitReady();
 
         Guild guild = jda.getGuildById(Configuration.get("guild_id"));
 
-        CommandListUpdateAction commands = guild.updateCommands();
-
-        commands.addCommands(
+        guild.updateCommands().addCommands(
                 Commands.slash("einlagern", "Nutzen beim Einlagern von Gegenständen in die Asservatenkammer.")
                         .addOptions(new OptionData(OptionType.STRING, "gegenstand1", "Der Gegenstand, der gerade eingelagert wurde", true, true))
                         .addOptions(new OptionData(OptionType.STRING, "gegenstand2", "Der Gegenstand, der gerade eingelagert wurde", false, true))
@@ -83,29 +77,33 @@ public class VaultHandler extends ListenerAdapter {
                         .setGuildOnly(true),
                 Commands.slash("history", "Zeigt eine Übersicht aller ein und ausgelagerten Dienstgegenständen eines Officers.")
                         .addOptions(new OptionData(OptionType.USER, "officer", "Officer, dessen Historie gezeigt werden soll", true, false))
-                        .addOptions(new OptionData(OptionType.STRING, "startDatum", "Beginn des anzuzeigenden Zeitraums. (24.12.2024)", false, false))
-                        .addOptions(new OptionData(OptionType.STRING, "endDatum", "Ende des anzuzeigenden Zeitraums (24.12.2024)", false, false))
+                        .addOptions(new OptionData(OptionType.STRING, "start_datum", "Beginn des anzuzeigenden Zeitraums. (24.12.2024)", false, false))
+                        .addOptions(new OptionData(OptionType.STRING, "end_datum", "Ende des anzuzeigenden Zeitraums (24.12.2024)", false, false))
                         .setGuildOnly(true)
         ).queue();
 
         adminRole = jda.getRoleById(Configuration.get("admin_role_id"));
 
+        /*
         Transaction transaction = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             transaction = session.beginTransaction();
+            List<VaultAccessLog> allLogs = session.createQuery("from VaultAccessLog", VaultAccessLog.class).getResultList();
+            allLogs.forEach(session::remove);
+            log.error("VaultAccessLogs deleted " + allLogs.size());
             List<VaultItem> allItems = session.createQuery("from VaultItem", VaultItem.class).getResultList();
             allItems.forEach(session::remove);
             log.error("items saved " + allItems.size());
-            allItems.forEach(item -> log.info(Long.toString(item.getId())));
+            allLogs.forEach(item -> log.info(Long.toString(item.getId())));
             transaction.commit();
-            allItems = session.createQuery("from VaultItem", VaultItem.class).getResultList();
-            allItems.forEach(item -> log.info(item.toString()));
+            allLogs = session.createQuery("from VaultAccessLog", VaultAccessLog.class).getResultList();
+            allLogs.forEach(item -> log.info(item.toString()));
         } catch (Exception e) {
             if (transaction != null) {
                 transaction.rollback();
             }
             e.printStackTrace();
-        }
+        }*/
     }
 
     @Override
@@ -134,17 +132,25 @@ public class VaultHandler extends ListenerAdapter {
                 processVaultAccessCommand(event, true);
                 break;
             case "history":
-                if (event.getMember().getRoles().contains(adminRole)) {
+                if (!event.getMember().getRoles().contains(adminRole)) {
                     event.reply("Du hast nicht die Berechtigung um diese Aktion auszuführen! Lasse dir dafür die Rolle " + adminRole.getAsMention() + " geben.").setEphemeral(true).queue();
                     return;
                 }
                 User officer = event.getOption("officer").getAsUser();
-                String startDateString = event.getOption("startDate").getAsString();
-                String endDateString = event.getOption("endDate").getAsString();
-                // TODO: Continue here -> need 2 new queries and null check for dates. (maybe private method for validation)
-                LocalDate startDate = LocalDate.parse(startDateString, dateFormat);
-                LocalDate endDate = LocalDate.parse(endDateString, dateFormat);
-                var accessLogs = HibernateUtil.getVaultAccessLogsByAccessorId(officer.getIdLong());
+                var startDateOption = event.getOption("startDate");
+                var endDateOption = event.getOption("endDate");
+                LocalDate startDate = null;
+                LocalDate endDate = null;
+             // TODO: Continue here -> need 2 new queries and null check for dates. (maybe private method for validation)
+                if (startDateOption != null) {
+                    startDate = LocalDate.parse(startDateOption.getAsString(), dateFormat);
+                    if (endDateOption != null) {
+                        endDate = LocalDate.parse(endDateOption.getAsString(), dateFormat);
+                    }
+                }
+                List<VaultAccessLog> accessLogs = HibernateUtil.getVaultAccessLogsByAccessorId(officer.getIdLong());
+                List<VaultItem> accessItems = HibernateUtil.getAllVaultItems();
+                event.replyEmbeds(createHistoryReportEmbed(accessLogs, officer, startDate, endDate, event)).queue();
             default:
                 log.info("Command '" + event.getName() + "' does not exist, but was issued by " + event.getMember().getNickname() + " with id: " + event.getMember().getIdLong());
         }
@@ -209,6 +215,77 @@ public class VaultHandler extends ListenerAdapter {
             for (var entry : vaultAccessDTO.getCustomItems().entrySet()) {
                 eb.appendDescription(entry.getValue()+"x "+entry.getKey()+"\n");
             }
+        }
+
+        /*
+            Add embed author:
+            1. Arg: name as string
+            2. Arg: url as string (can be null)
+            3. Arg: icon url as string (can be null)
+         */
+        eb.setAuthor("LSSD | Asservatenkammer", null, event.getGuild().getIconUrl());//"https://github.com/zekroTJA/DiscordBot/blob/master/.websrc/zekroBot_Logo_-_round_small.png");
+
+        /*
+            Set footer:
+            1. Arg: text as string
+            2. icon url as string (can be null)
+         */
+        eb.setFooter(event.getMember().getEffectiveName(), event.getMember().getAvatarUrl());
+
+        eb.setTimestamp(event.getTimeCreated());
+
+        /*
+            Set image:
+            Arg: image url as string
+         */
+        //eb.setImage("https://github.com/zekroTJA/DiscordBot/blob/master/.websrc/logo%20-%20title.png");
+
+        return eb.build();
+    }
+
+    private MessageEmbed createHistoryReportEmbed(List<VaultAccessLog> vaultAccessLogs, User accessor, LocalDate startDate, LocalDate endDate, SlashCommandInteractionEvent event) {
+
+        EmbedBuilder eb = new EmbedBuilder();
+
+        eb.setTitle("Asservatenkammer Report des Officers " + accessor.getEffectiveName() + "!");
+        String description = "Die Einträge beziehen sich nur auf Dienstausrüstung und stellen die Differenz da, also das Ergebenis aus eingelagert - ausgelagert";
+
+        if (endDate != null && startDate != null) {
+            description += " im Zeitrahmen von " + startDate.toString() + " bis " + endDate.toString();
+        }
+        else if (startDate != null) {
+            description += " seit dem " + startDate.toString() + " bis heute";
+        }
+        eb.setDescription(description+"!");
+        eb.setColor(Color.cyan);
+
+        eb.appendDescription("\n\nDienstausrüstungs Report:\n");
+        Map<KnownItem, Integer> inItems = new HashMap<>();
+        Map<KnownItem, Integer> outItems = new HashMap<>();
+        List<VaultItem> deltaItems = new ArrayList<>();
+        // Sort item to in and out and accumulate the amount.
+        for (VaultAccessLog accessLog : vaultAccessLogs) {
+            if (accessLog.getPutIn()) {
+                for (var item : accessLog.getItems()) {
+                    inItems.merge(KnownItem.getByLabel(item.getItem()), item.getAmount(), Integer::sum);
+                }
+            }
+            else {
+                for (var item : accessLog.getItems()) {
+                    outItems.merge(KnownItem.getByLabel(item.getItem()), item.getAmount(), Integer::sum);
+                }
+            }
+        }
+
+        for (KnownItem knownItem : Stream.concat(inItems.keySet().stream(), outItems.keySet().stream()).collect(Collectors.toSet())) {
+            int addValue = inItems.getOrDefault(knownItem, 0);
+            int subtractValue = outItems.getOrDefault(knownItem, 0);
+            deltaItems.add(new VaultItem(knownItem.label, addValue - subtractValue));
+        }
+
+        // Set fields for embed
+        for (VaultItem diffItem : deltaItems) {
+            eb.addField(diffItem.getItem(), (Integer.signum(diffItem.getAmount()) == 1 ? "+" : "") + diffItem.getAmount().toString()+"x", false);
         }
 
         /*
