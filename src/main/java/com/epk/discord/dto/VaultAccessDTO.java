@@ -76,9 +76,10 @@ public class VaultAccessDTO {
     public VaultAccessLog toVaultAccessLog() {
         VaultAccessLog accessLog = new VaultAccessLog();
         accessLog.setAccessorId(accessorId);
+        accessLog.setPutIn(putIn);
         // persist only known items. Maybe change later depending on requirements!
         Set<VaultItem> items = Sets.newHashSet(knownItems.entrySet().stream().map(
-                item -> new VaultItem(item.getKey().label, item.getValue())
+                item -> new VaultItem(item.getKey().label, item.getValue(), accessLog)
                 ).toList());
         accessLog.setItems(items);
         return accessLog;

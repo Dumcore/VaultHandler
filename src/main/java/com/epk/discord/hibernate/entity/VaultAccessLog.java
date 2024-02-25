@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -19,7 +21,10 @@ public class VaultAccessLog {
     @Column(name = "accessor_id", nullable = false)
     private Long accessorId;
 
-    @OneToMany(mappedBy = "vaultAccessLog", cascade=CascadeType.ALL)
+    @Column(name = "put_in", nullable = false)
+    private Boolean putIn;
+
+    @OneToMany(mappedBy = "vaultAccessLog", cascade=CascadeType.ALL, fetch = FetchType.EAGER)
     @Column(nullable = false)
     private Set<VaultItem> items;
 
@@ -30,21 +35,24 @@ public class VaultAccessLog {
 
     public VaultAccessLog() { }
 
-    public VaultAccessLog(Long id, Long accessorId, Set<VaultItem> items, Timestamp accessTime) {
+    public VaultAccessLog(Long id, Long accessorId, boolean putIn, Set<VaultItem> items, Timestamp accessTime) {
         this.id = id;
         this.accessorId = accessorId;
+        this.putIn = putIn;
         this.items = items;
         this.accessTime = accessTime;
     }
 
-    public VaultAccessLog(Long accessorId, Set<VaultItem> items, Timestamp accessTime) {
+    public VaultAccessLog(Long accessorId, boolean putIn, Set<VaultItem> items, Timestamp accessTime) {
         this.accessorId = accessorId;
+        this.putIn = putIn;
         this.items = items;
         this.accessTime = accessTime;
     }
 
-    public VaultAccessLog(Long accessorId, Set<VaultItem> items) {
+    public VaultAccessLog(Long accessorId, boolean putIn, Set<VaultItem> items) {
         this.accessorId = accessorId;
+        this.putIn = putIn;
         this.items = items;
     }
 
@@ -78,5 +86,23 @@ public class VaultAccessLog {
 
     public void setAccessTime(Timestamp accessTime) {
         this.accessTime = accessTime;
+    }
+
+    public Boolean getPutIn() {
+        return putIn;
+    }
+
+    public void setPutIn(Boolean putIn) {
+        this.putIn = putIn;
+    }
+
+    @Override
+    public String toString() {
+        return "VaultAccessLog {" +
+                "id=" + id +
+                ", accessorId=" + accessorId +
+                ", items=" + Arrays.toString(List.of(items).toArray())+
+                ", accessTime=" + accessTime +
+                '}';
     }
 }

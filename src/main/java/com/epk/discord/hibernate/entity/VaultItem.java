@@ -25,6 +25,12 @@ public class VaultItem {
         this.amount = amount;
     }
 
+    public VaultItem(String item, Integer amount, VaultAccessLog accessLog) {
+        this.item = item;
+        this.amount = amount;
+        this.vaultAccessLog = accessLog;
+    }
+
     public Long getId() {
         return id;
     }
@@ -55,5 +61,14 @@ public class VaultItem {
 
     public void setVaultAccessLog(VaultAccessLog vaultAccessLog) {
         this.vaultAccessLog = vaultAccessLog;
+    }
+
+    @Override
+    public String toString() {
+        return "VaultItem {" +
+                "id=" + id +
+                ", amount=" + amount +
+                ", item='" + item + '\'' +
+                '}';
     }
 }
