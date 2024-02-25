@@ -71,7 +71,17 @@ public class HibernateUtil {
             resultList = session.createNamedQuery("VaultAccessLog_findByAccessorId", VaultAccessLog.class)
                     .setParameter("accessorId", id).getResultList();
         } catch (HibernateException ex) {
-            log.error("Exception occured while trying to get VaultAccessLogs by accessorId: " + id, ex);
+            log.error("Exception occurred while trying to get VaultAccessLogs by accessorId: " + id, ex);
+        }
+        return resultList;
+    }
+
+    public static List<VaultItem> getAllVaultItems() {
+        List<VaultItem> resultList = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            resultList = session.createQuery("from VaultItem", VaultItem.class).getResultList();
+        } catch (HibernateException ex) {
+            log.error("Exception occurred while trying to get all VaultItems", ex);
         }
         return resultList;
     }
