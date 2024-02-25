@@ -3,6 +3,7 @@ package com.epk.discord;
 // import com.epk.discord.adapter.SheetConnector;
 import com.epk.discord.dto.KnownItem;
 import com.epk.discord.dto.VaultAccessDTO;
+import com.epk.discord.hibernate.dao.VaultAccessLogDao;
 import com.epk.discord.hibernate.entity.VaultAccessLog;
 import com.epk.discord.hibernate.entity.VaultItem;
 import com.epk.discord.hibernate.HibernateUtil;
@@ -36,6 +37,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.sql.Connection;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -142,16 +144,20 @@ public class VaultHandler extends ListenerAdapter {
                 LocalDate startDate = null;
                 LocalDate endDate = null;
              // TODO: Continue here -> need 2 new queries and null check for dates. (maybe private method for validation)
+                List<VaultAccessLog> accessLogs = new ArrayList<>();
                 if (startDateOption != null) {
                     startDate = LocalDate.parse(startDateOption.getAsString(), dateFormat);
                     if (endDateOption != null) {
                         endDate = LocalDate.parse(endDateOption.getAsString(), dateFormat);
                     }
+                    else
+                        accessLogs = VaultAccessLogDao.findVaultAccessLogsByAccessorIdSinceDate(officer.getIdLong(), Timestamp.valueOf(startDate.atStartOfDay()));
                 }
                 else
                     accessLogs = VaultAccessLogDao.findVaultAccessLogsByAccessorId(officer.getIdLong());
                 List<VaultItem> accessItems = HibernateUtil.getAllVaultItems();
                 event.replyEmbeds(createHistoryReportEmbed(accessLogs, officer, startDate, endDate, event)).queue();
+                break;
             default:
                 log.info("Command '" + event.getName() + "' does not exist, but was issued by " + event.getMember().getNickname() + " with id: " + event.getMember().getIdLong());
         }
