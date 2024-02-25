@@ -12,6 +12,8 @@ import java.util.Set;
 @Table(name = "vault_access_log")
 @NamedQuery(name = "VaultAccessLog_findByAccessorId",
            query = "from VaultAccessLog where accessorId = :accessorId")
+@NamedQuery(name = "VaultAccessLog_findByAccessorIdSinceDate",
+           query = "from VaultAccessLog where accessorId = :accessorId and accessTime >= :accessTime")
 public class VaultAccessLog {
 
     @Id

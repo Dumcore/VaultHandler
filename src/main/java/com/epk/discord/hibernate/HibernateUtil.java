@@ -17,7 +17,7 @@ public class HibernateUtil {
     private static StandardServiceRegistry registry;
     private static SessionFactory sessionFactory;
 
-    private static final Logger log = LoggerFactory.getLogger(VaultHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(HibernateUtil.class);
 
     public static SessionFactory getSessionFactory() {
         if (sessionFactory == null) {
@@ -60,20 +60,6 @@ public class HibernateUtil {
                 transaction.rollback();
             }
         }
-    }
-
-    public static List<VaultAccessLog> getVaultAccessLogsByAccessorId(Long id) {
-        if (id == null) {
-            return null;
-        }
-        List<VaultAccessLog> resultList = null;
-        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            resultList = session.createNamedQuery("VaultAccessLog_findByAccessorId", VaultAccessLog.class)
-                    .setParameter("accessorId", id).getResultList();
-        } catch (HibernateException ex) {
-            log.error("Exception occurred while trying to get VaultAccessLogs by accessorId: " + id, ex);
-        }
-        return resultList;
     }
 
     public static List<VaultItem> getAllVaultItems() {

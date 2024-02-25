@@ -148,7 +148,8 @@ public class VaultHandler extends ListenerAdapter {
                         endDate = LocalDate.parse(endDateOption.getAsString(), dateFormat);
                     }
                 }
-                List<VaultAccessLog> accessLogs = HibernateUtil.getVaultAccessLogsByAccessorId(officer.getIdLong());
+                else
+                    accessLogs = VaultAccessLogDao.findVaultAccessLogsByAccessorId(officer.getIdLong());
                 List<VaultItem> accessItems = HibernateUtil.getAllVaultItems();
                 event.replyEmbeds(createHistoryReportEmbed(accessLogs, officer, startDate, endDate, event)).queue();
             default:
