@@ -138,17 +138,19 @@ public class VaultHandler extends ListenerAdapter {
                     event.reply("Du hast nicht die Berechtigung um diese Aktion auszuführen! Lasse dir dafür die Rolle " + adminRole.getAsMention() + " geben.").setEphemeral(true).queue();
                     return;
                 }
-                User officer = event.getOption("officer").getAsUser();
-                var startDateOption = event.getOption("startDate");
-                var endDateOption = event.getOption("endDate");
+                Member officer = event.getOption("officer").getAsMember();
+                var startDateOption = event.getOption("start_datum");
+                var endDateOption = event.getOption("end_datum");
                 LocalDate startDate = null;
                 LocalDate endDate = null;
-             // TODO: Continue here -> need 2 new queries and null check for dates. (maybe private method for validation)
+
                 List<VaultAccessLog> accessLogs = new ArrayList<>();
                 if (startDateOption != null) {
                     startDate = LocalDate.parse(startDateOption.getAsString(), dateFormat);
                     if (endDateOption != null) {
                         endDate = LocalDate.parse(endDateOption.getAsString(), dateFormat);
+                        // add 1 day to endDate and subtract 1 second of "startOfDay" to get the last minute of the original endDate -> 20.12.2024 -> 21.12.2024 00:00:00 -> 20.12.2024 23:59:59
+                        accessLogs = VaultAccessLogDao.findVaultAccessLogsByAccessorIdDuringTimeSpan(officer.getIdLong(), Timestamp.valueOf(startDate.atStartOfDay()), Timestamp.valueOf(endDate.plusDays(1).atStartOfDay().minusSeconds(1)));
                     }
                     else
                         accessLogs = VaultAccessLogDao.findVaultAccessLogsByAccessorIdSinceDate(officer.getIdLong(), Timestamp.valueOf(startDate.atStartOfDay()));
@@ -181,16 +183,9 @@ public class VaultHandler extends ListenerAdapter {
 
         // Create the EmbedBuilder instance
         EmbedBuilder eb = new EmbedBuilder();
-        /*
-            Set the title:
-            1. Arg: title as string
-            2. Arg: URL as string or could also be null
-         */
+
         eb.setTitle("Ein Officer hat die Asservatenkammer geöffnet!", null);
 
-        /*
-            Set the color
-         */
         if (vaultAccessDTO.isPutIn()) {
             eb.setColor(Color.green);
         }
@@ -198,18 +193,8 @@ public class VaultHandler extends ListenerAdapter {
             eb.setColor(Color.red);
         }
 
-        /*
-            Set the text of the Embed:
-            Arg: text as string
-         */
         eb.setDescription("Officer <@"+event.getMember().getIdLong()+"> hat folgendes " + (vaultAccessDTO.isPutIn() ? "eingelagert" : "ausgelagert") + ":\n");
 
-        /*
-            Add fields to embed:
-            1. Arg: title as string
-            2. Arg: text as string
-            3. Arg: inline mode true / false
-         */
         if (vaultAccessDTO.getKnownItems().size() > 0) {
             eb.appendDescription("\n**Dienstausrüstung:**\n");
             for (var entry : vaultAccessDTO.getKnownItems().entrySet()) {
@@ -224,21 +209,8 @@ public class VaultHandler extends ListenerAdapter {
             }
         }
 
-        /*
-            Add embed author:
-            1. Arg: name as string
-            2. Arg: url as string (can be null)
-            3. Arg: icon url as string (can be null)
-         */
         eb.setAuthor("LSSD | Asservatenkammer", null, event.getGuild().getIconUrl());//"https://github.com/zekroTJA/DiscordBot/blob/master/.websrc/zekroBot_Logo_-_round_small.png");
-
-        /*
-            Set footer:
-            1. Arg: text as string
-            2. icon url as string (can be null)
-         */
         eb.setFooter(event.getMember().getEffectiveName(), event.getMember().getAvatarUrl());
-
         eb.setTimestamp(event.getTimeCreated());
 
         /*
@@ -250,21 +222,31 @@ public class VaultHandler extends ListenerAdapter {
         return eb.build();
     }
 
-    private MessageEmbed createHistoryReportEmbed(List<VaultAccessLog> vaultAccessLogs, User accessor, LocalDate startDate, LocalDate endDate, SlashCommandInteractionEvent event) {
+    private MessageEmbed createHistoryReportEmbed(List<VaultAccessLog> vaultAccessLogs, Member accessor, LocalDate startDate, LocalDate endDate, SlashCommandInteractionEvent event) {
 
         EmbedBuilder eb = new EmbedBuilder();
 
+        // First set everything that is static here, to allow multiple cases for returns
         eb.setTitle("Asservatenkammer Report des Officers " + accessor.getEffectiveName() + "!");
-        String description = "Die Einträge beziehen sich nur auf Dienstausrüstung und stellen die Differenz da, also das Ergebenis aus eingelagert - ausgelagert";
+        eb.setColor(Color.cyan);
+        eb.setAuthor("LSSD | Asservatenkammer", null, event.getGuild().getIconUrl());
+        eb.setFooter(accessor.getEffectiveName(), accessor.getAvatarUrl());
+        eb.setTimestamp(event.getTimeCreated());
+
+        if (vaultAccessLogs == null || vaultAccessLogs.isEmpty()) {
+            eb.setDescription("Der Officer " + accessor.getAsMention() + " hat im angegebenen Zeitraum keine Dienstausrüstung ein oder ausgelagert!");
+            return eb.build();
+        }
+
+        String description = "Die Einträge beziehen sich nur auf Dienstausrüstung und stellen die Differenz da, also das Ergebenis aus eingelagert minus ausgelagert";
 
         if (endDate != null && startDate != null) {
-            description += " im Zeitrahmen von " + startDate.toString() + " bis " + endDate.toString();
+            description += " im Zeitrahmen von " + startDate.format(dateFormat) + " bis " + endDate.format(dateFormat);
         }
         else if (startDate != null) {
-            description += " seit dem " + startDate.toString() + " bis heute";
+            description += " seit dem " + startDate.format(dateFormat)+ " bis heute";
         }
         eb.setDescription(description+"!");
-        eb.setColor(Color.cyan);
 
         eb.appendDescription("\n\nDienstausrüstungs Report:\n");
         Map<KnownItem, Integer> inItems = new HashMap<>();
@@ -294,23 +276,6 @@ public class VaultHandler extends ListenerAdapter {
         for (VaultItem diffItem : deltaItems) {
             eb.addField(diffItem.getItem(), (Integer.signum(diffItem.getAmount()) == 1 ? "+" : "") + diffItem.getAmount().toString()+"x", false);
         }
-
-        /*
-            Add embed author:
-            1. Arg: name as string
-            2. Arg: url as string (can be null)
-            3. Arg: icon url as string (can be null)
-         */
-        eb.setAuthor("LSSD | Asservatenkammer", null, event.getGuild().getIconUrl());//"https://github.com/zekroTJA/DiscordBot/blob/master/.websrc/zekroBot_Logo_-_round_small.png");
-
-        /*
-            Set footer:
-            1. Arg: text as string
-            2. icon url as string (can be null)
-         */
-        eb.setFooter(event.getMember().getEffectiveName(), event.getMember().getAvatarUrl());
-
-        eb.setTimestamp(event.getTimeCreated());
 
         /*
             Set image:
