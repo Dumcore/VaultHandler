@@ -8,13 +8,15 @@ import java.util.regex.Pattern;
 
 public final class Configuration {
 
-    private static final String appConfigPath = Thread.currentThread().getContextClassLoader().getResource("").getPath() + "application.properties";
+    protected static final String propertyFileName = "application.properties";
+
+    static ClassLoader loader = Thread.currentThread().getContextClassLoader();
 
     private static final Properties appProps = new Properties();
 
     static {
         try {
-            appProps.load(new FileInputStream(appConfigPath));
+            appProps.load(loader.getResourceAsStream(propertyFileName));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
