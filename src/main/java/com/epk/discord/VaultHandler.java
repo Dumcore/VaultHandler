@@ -228,7 +228,7 @@ public class VaultHandler extends ListenerAdapter {
 
         // First set everything that is static here, to allow multiple cases for returns
         eb.setTitle("Asservatenkammer Report des Officers " + accessor.getEffectiveName() + "!");
-        eb.setColor(Color.cyan);
+        eb.setColor(Color.orange);
         eb.setAuthor("LSSD | Asservatenkammer", null, event.getGuild().getIconUrl());
         eb.setFooter(accessor.getEffectiveName(), accessor.getAvatarUrl());
         eb.setTimestamp(event.getTimeCreated());
@@ -265,8 +265,10 @@ public class VaultHandler extends ListenerAdapter {
                 }
             }
         }
+        List<KnownItem> usedItems = new ArrayList<>((Collection) Stream.concat(inItems.keySet().stream(), outItems.keySet().stream()).toList());
+        usedItems.sort(Comparator.comparing(o -> o.label));
 
-        for (KnownItem knownItem : Stream.concat(inItems.keySet().stream(), outItems.keySet().stream()).collect(Collectors.toSet())) {
+        for (KnownItem knownItem : usedItems.stream().distinct().toList()) {
             int addValue = inItems.getOrDefault(knownItem, 0);
             int subtractValue = outItems.getOrDefault(knownItem, 0);
             deltaItems.add(new VaultItem(knownItem.label, addValue - subtractValue));
